@@ -1,0 +1,151 @@
+---
+title: "Praca domowa nr. 3"
+author: "Kacper Słowikowski, Krzysztof Tabeau"
+output: html_document
+---
+
+1. Wstęp
+
+Naszym celem badawczym jest sprawdzenie jak oddziaływują różne pory roku na użycie publicznych rowerów w Nowym Yorku. 
+Będziemy brać pod uwagę zimę i lato na przestrzeni lat 2015-2020. Wybraliśmy do tego miesiące grudzień-luty oraz  czerwiec-sierpień.
+W naszych badaniach będziemy porównywać wiek oraz przebyty dystans i czas wypożyczenia w zależności od płci oraz popularność stacji rowerowych w rożnych miesiącach.
+Wszystkie dane użyte w badaniu zostały udostepnione przez NYC Bike Share, LLC.
+
+2. Pytania na które chcemy uzyskać odpowiedzi
+
+*	Jaki wpływ na Liczbę wypożyczeń ma pora roku (zimowa/letnia)?
+*	Jaki wpływ na liczbę wypożyczeń ma wiek?
+*	Jaki wpływ na liczbę wypożyczeni ma płeć
+*	Jaki wpływ na czas jazdy ma płeć osoby wypożyczającej oraz miesiąc?
+*	Jaki wpływ na dystans między stacją początkową a stacją końcową ma płeć osoby wypożyczającej oraz miesiąc?
+
+3. Przebieg badań
+
+* Wybór pomysłu
+* Podział prac
+* Napisanie skryptów odpowiedzialnych za selekcję dostępnych danych.
+* Zapisanie wyników selekcji danych w formacie .csv.
+* Napisanie skryptów odpowiedzialnych za przetworzenie danych.
+* Przetworzenie danych i zapisanie statystyk potrzebnych do analizy w formie .csv.
+* Zwizualizowanie danych za pomoca tabel i grafów dla lepszej analizy rezultatów.
+* Analiza wyników i zapisanie wniosków.
+
+4. Wyniki badań
+
+```{r intro, message=FALSE, warning=FALSE, echo=FALSE}
+source("wykresy_2.R")
+source("wykresy.R")
+season_summer <- "lato"
+years_summer <- 2015:2019
+month_names_summer <- c("czerwiec","lipiec","sierpien")
+
+season_winter <- "zima"
+years_winter <- 2016:2020
+month_names_winter <- c("grudzien","styczen","luty")
+
+col_dist_names <- c("suma","srednia","maksimum","minimum","<1km","1-2km","2km<","10km<")
+col_time_names <- c("suma","srednia","maksimum","minimum","<10m","10m-1h","1h<","24h<")
+```
+
+
+```{r intro2, message=FALSE, warning=FALSE, echo=FALSE}
+summer_dist <- get_data(season_summer, years_summer,month_names_summer,"dystans")
+winter_dist <- get_data(season_winter, years_winter,month_names_winter,"dystans")
+summer_time <- get_data(season_summer, years_summer,month_names_summer,"czas")
+winter_time <- get_data(season_winter, years_winter,month_names_winter,"czas")
+```
+
+4.1.Jaki wpływ na Liczbę wypożyczeń ma pora roku (zimowa/letnia)?
+
+```{r general_plots, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(summer_dist, aes(x = year, y = suma, fill = month)) + geom_col(position = "dodge") + ggtitle("Liczba wypożyczeń w lecie") + ylim(0,2500000)
+ggplot(winter_time, aes(x = year, y = suma, fill = month)) + geom_col(position = "dodge") + ggtitle("Liczba wypożyczeń w zimie") + ylim(0,2500000)
+```
+
+Możemy zauważyć prawie dwukrotną różnicę między miesiącami letnimi a miesiącami zimowymi w każdym poszczególnym roku, czego się spodziewaliśmy ze względu na warunki pogodowe. Widzimy też tendencję wzrostową w liczbie wypożyczeni z roku na rok. W miesiącach letnich wyniki nie mają dużych dysproporcji procentowych. Widzimy wzrost  w każdym miesiącu. Również liczba powiększyła się dwukrotnie od roku 2015 do 2019.W miesiącach zimowych zauważamy zmianę liczby w poszczególnych miesiącach: spadek liczby w grudniu w stosunku do stycznia. Możemy z tego wnioskować, że ludzie zaczynają później jeździć w zimie na rowerze. Jednocześnie widzimy dwukrotny wzrost liczby wypożyczeni w styczniu i lutym oraz nieduże wahania w grudniu.
+
+4.2. Jaki wpływ na liczbę wypożyczeni ma płeć?
+
+```{r plots_plec, message=FALSE, warning=FALSE, echo=FALSE}
+plots_plec();
+```
+
+Możemy zauważyć prawie dwukrotną różnicę między miesiącami letnimi a miesiącami zimowymi w każdym poszczególnym roku, czego się spodziewaliśmy ze względu na warunki pogodowe. Widzimy też tendencję wzrostową w liczbie wypożyczeni z roku na rok. W miesiącach letnich wyniki nie mają dużych dysproporcji procentowych. Widzimy wzrost  w każdym miesiącu. Również liczba powiększyła się dwukrotnie od roku 2015 do 2019; oprócz miesiąca grudzień, gdzie liczba zmieniała się niewiele. W miesiącach zimowych zauważamy zmianę liczby w poszczególnych miesiącach: spadek liczby w grudniu w stosunku do stycznia. Możemy z tego wnioskować, że ludzie zaczynają później jeździć w zimie na rowerze. Jednocześnie widzimy dwukrotny wzrost liczby wypożyczeni w styczniu i lutym oraz nieduże wahania w grudniu.
+
+4.3. Jaki wpływ na liczbę wypożyczeń ma wiek?
+
+```{r plots_wiek, message=FALSE, warning=FALSE, echo=FALSE}
+plots_wiek(2014,"czerwiec","lato")
+plots_wiek(2014,"lipiec","lato")
+plots_wiek(2014,"sierpien","lato")
+
+plots_wiek(2015,"grudzien","zima")
+plots_wiek(2015,"styczen","zima")
+plots_wiek(2015,"luty","zima")
+```
+
+Na pierwszy rzut oka zauważamy, że osoby, które nie podały swojej płci do 2018 roku nie podawały również swojego wieku. Od 2018 roku już nie było żadnego przypadku braku wieku, może to być powodem np. wymogu podana wieku podczas rejestracji. Widzimy też, że większość tych osób co nie podała płci jest w wieku powyżej 50 roku życia.
+Widzimy też, że ten sposób poruszania się jest mało z popularny w grupie do 18 roku życia. Na początku analizowanego okresu również w grupie 18-26 lat. Jednakże widzimy wzrost liczby wypożyczeń w tej grupie wiekowej.
+Na początku najbardziej popularne rowery były w grupie 36-50 lat. Następna wśród mężczyzn była powyżej 50 roku życia, a u kobiet 27-35. W kolejnych latach w lato u grupa wiekowa 27-35  miała najszybszy wzrost i na końcu okresu uzyskała największą liczbę wypożyczeni. W zimę u kobiet również ta grupa wiekowa uzyskała największą liczbę wypożyczeń. U mężczyzn wzrost był najszybszy, ale nie przekroczył liczby następnej grupy wiekowej (36-50).
+
+
+4.4Jaki wpływ na dystans między stacją początkową a stacją końcową ma płeć osoby wypożyczającej oraz miesiąc?
+
+```{r jumbo_plots1, message=FALSE, warning=FALSE, echo=FALSE}
+jumbo_plot(winter_dist,2016,"grudzien","dystans",col_dist_names)
+jumbo_plot(winter_dist,2016,"styczen","dystans",col_dist_names)
+jumbo_plot(winter_dist,2016,"luty","dystans",col_dist_names)
+
+jumbo_plot(summer_dist,2015,"czerwiec","dystans",col_dist_names)
+jumbo_plot(summer_dist,2015,"lipiec","dystans",col_dist_names)
+jumbo_plot(summer_dist,2015,"sierpien","dystans",col_dist_names)
+```
+
+Analizowaliśmy ten wpływ na trzech dystansach, krótki (do 1km), średnim(1-2km) oraz dłuższym (powyżej 2km). Obserwując poszczególne lata i miesiące możemy zauważyć, że rozkład liczby wypożyczeń na dystans jest dla każdego miesiąca bardzo podobny. Dotyczy to każdej z obserwowanych płci
+W miesiącach zimowych możemy zaobserwować, największy wzrost liczby wypożyczeni na najkrótszym dystansie co prawdopodobnie jest przyczyną gorszej, zimniejszej pogody, która nie jest korzystna do dłuższych podróży. 
+Natomiast w lecie na początku widzimy  w miarę wyrównaną liczbę między krótkim, a średnim dystansem, chociaż w odróżnieniu do mężczyzn u kobiet zauważamy większą liczbę wypożyczeń na dystansie 1-2 km niż mniejszym od 1 km. W kolejnych latach jednak widzimy rosnącą dysproporcje u mężczyzn i szybszy wzrost liczby wypożyczeń na krótkim dystansie – co może świadczyć o rosnącej popularności tego środka transportu wśród ludzi, na krótkich odległościach.
+
+4.5. Jaki wpływ na czas jazdy ma płeć osoby wypożyczającej oraz miesiąc?
+
+```{r jumbo_plots2, message=FALSE, warning=FALSE, echo=FALSE}
+jumbo_plot(winter_dist,2016,"grudzien","czas",col_time_names)
+jumbo_plot(winter_dist,2016,"styczen","czas",col_time_names)
+jumbo_plot(winter_dist,2016,"luty","czas",col_time_names)
+
+jumbo_plot(summer_dist,2015,"czerwiec","czas",col_time_names)
+jumbo_plot(summer_dist,2015,"lipiec","czas",col_time_names)
+jumbo_plot(summer_dist,2015,"sierpien","czas",col_time_names)
+```
+
+Po przeanalizowaniu wykresów czasu wypożyczenia zauważyliśmy są niemal identyczne jak wykresy dystansu. Jednak zdecydowaliśmy się je opisać osobno.
+Obserwując wykresy dla poszczególnych miesięcy i lat możemy zauważyć, że rozkład liczby wypożyczeń dla każdego miesiąca jest podobny.
+W miesiącach zimowych możemy zaobserwować, największy wzrost liczby wypożyczeni do 10 minut. Pogoda w miesiącach  zimowych nie sprzyja długim przejażdżkom stąd wnioskujemy taką różnicę.
+Natomiast w lecie na początku widzimy  w miarę wyrównaną liczbę między krótkimi (do 10 min), a 10min-1h czasem wypożyczeni. Jednak tak jak przy dystansie u kobiet zauważamy większą liczbę o średnim czasie wypożyczenia w odróżnieniu do mężczyzn, gdzie dominują krótkie czasy. W kolejnych latach jednak widzimy rosnącą dysproporcje u mężczyzn. Liczba wypożyczeń na krótki czas zyskuje przewagę. 
+
+```{r mean_dist, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(summer_dist, aes(x = year, y = srednia, fill = month)) + geom_col(position = "dodge") + ggtitle("Sredni dystans w lecie") + xlab("rok") + ylab("srednia [km]")
+ggplot(winter_dist, aes(x = year, y = srednia, fill = month)) + geom_col(position = "dodge") + ggtitle("Srednia dystans w zimie") + xlab("rok") + ylab("srednia [km]")
+```
+
+```{r mean_time, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(summer_time, aes(x = year, y = srednia / 60, fill = month)) + geom_col(position = "dodge") + ggtitle("Sredni czas wypozyczenia w lecie") + xlab("rok")  + ylab("srednia [min]")
+ggplot(winter_time, aes(x = year, y = srednia / 60, fill = month)) + geom_col(position = "dodge") + ggtitle("Sredni czas wypozyczenia w zimie [min]") + xlab("rok") + ylab("srednia [min]")
+```
+
+```{r stations, message=FALSE, warning=FALSE, echo=FALSE}
+table_data(season_summer,years_summer, month_names_summer)
+table_data(season_winter,years_winter, month_names_winter)
+legend <- cbind(2015:2020, c("fioletowy","niebieski","zielony","zolty","pomarańczowy","czerwony"))
+colnames(legend) <- c("Rok","Kolor")
+legend <- as.data.frame(legend)
+knitr::kable(legend, caption = "Legenda")
+```
+
+
+5. Wnioski końcowe
+
+Po analizie wszystkich wykresów jesteśmy w stanie powiedzieć, że wypożyczanie rowerów ma tendencję wzrostową zarówno u kobiet jak i u mężczyzn. Jednocześnie coraz mnie osób nie podaje swojej płci przy konta i wypożyczaniu rowerów.
+Zauważaliśmy również zwiększającą się liczbę wypożyczeni wśród osób młodych 18-35. Jest to dobry znak, że młodzi ludzie wybierają aktywny środek transportu.
+Analiza ta pokazała również, że wszyscy chętniej wypożyczają rowery w lecie, gdy pogoda temu sprzyja niż w zimie kiedy jest chłodno.
+Po analizie wykresów czasu i dystansu zauważyliśmy, że są one niemal identyczne, jeśli nie identyczne. Kieruje nas to w przekonanie, że najbardziej modne w Nowym Jorku wśród mężczyzn jest wypożyczanie na krótki czas, co daje powód, niewielkich odległości między punktami pobrania i oddania. U kobiet natomiast niewiele, ale przeważa liczba wypożyczeń o czasie 10min-1h co przekłada się również na dłuższy dystans 1-2km.
+

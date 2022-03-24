@@ -1,0 +1,133 @@
+---
+title: "Testy"
+author: "Krzysztof Tabeau"
+date: "12/05/2020"
+output: pdf_document
+---
+
+1. Wstęp
+
+W poniższych testach jest zastosowany następujący schemat. Dla każdej funkcji agregującej, dla jednej z 3 metryk (1,2,INF) dla jednego z trzech zbiorów danych (affairs, auto_ord, glass) jest oblicznana ramka danych w postaci błędów dla różnych k (1,3,5,7,9,11,13,15,17,19). Do tego jest wykres obrazujący dane. Dodatkowo jest obliczana próba 1-nn, gdzie dla k=1 próba ucząca i testowa są te same. Wnioski znajdują się na końcu.
+
+2. Potrzebne dane
+```{r Potrzebne dane}
+library("ggplot2")
+source("knn_pomocnicze.R")
+source("funkcje_agregujace.R")
+source("knn.R")
+source("bledy.R")
+affairs <- read.csv("https://www.gagolewski.com/resources/data/ordinal-regression/affairs.csv")
+auto_ord <- read.csv("https://www.gagolewski.com/resources/data/ordinal-regression/auto_ord.csv")
+glass <- read.csv("https://www.gagolewski.com/resources/data/ordinal-regression/glass.csv")
+```
+
+3. Srednia (L2, affairs)
+
+```{r Srednia}
+tab <- przetworz_test(affairs,2, FN = srednia_a)
+print(tab)
+przetworz_1nn(affairs,2, FN = srednia_a )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+4. Moda (L(INF), glass)
+
+```{r Moda}
+tab <- przetworz_test(glass,Inf, FN = moda)
+print(tab)
+przetworz_1nn(glass,Inf, FN = moda )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+5. Mediana (L1, auto_ord)
+
+```{r Mediana}
+tab <- przetworz_test(glass,Inf, FN = mediana)
+print(tab)
+przetworz_1nn(glass,Inf, FN = mediana )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+
+6. Minkara1.5 (L1, affairs)
+
+```{r Minkara1.5}
+tab <- przetworz_test(affairs,1, FN = minkara1.5)
+print(tab)
+przetworz_1nn(affairs,1, FN = minkara1.5 )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+
+7. Minkara3 (L(Inf), affairs)
+
+```{r Minkara3}
+tab <- przetworz_test(auto_ord,Inf, FN = minkara3)
+print(tab)
+przetworz_1nn(auto_ord,Inf, FN = minkara3 )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+
+
+8. Minkara10 (L2, auto_ord)
+
+```{r Minkara10}
+tab <- przetworz_test(auto_ord,2, FN = minkara10)
+print(tab)
+przetworz_1nn(auto_ord,2, FN = minkara10 )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+
+9. Srednia_parzytych (L2, glass)
+
+```{r Srednia_parzytych}
+tab <- przetworz_test(glass,2, FN = srednia_parzytych)
+print(tab)
+przetworz_1nn(glass,2, FN = srednia_parzytych )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+
+10. Srednia_nieparzytych (L1, glass)
+
+```{r Srednia_nieparzytych}
+tab <- przetworz_test(glass,1, FN = srednia_nieparzytych)
+print(tab)
+przetworz_1nn(glass,1, FN = srednia_nieparzytych )
+
+ggplot(data = tab, aes(x = k, y = ERR)) + geom_col(color = "darkblue", fill = "darkblue") + ylim(0,1) + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MAD)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+ggplot(data = tab, aes(x = k, y = MSE)) + geom_col(color = "darkblue", fill = "darkblue") + scale_x_discrete(limits = tab$k)
+```
+
+11. Wnioski
+
+W większości przpadków test, gdzie próba testowa i ucząca się pokrywają wychodzi z zerowym błędem. Tak byc powinno zawsze, ale dla pakietu danych affairs zdażają się takie same dane z różnymi etykietami, przez co w pewnym momencie następuje losowanie co nie zawsze daje dobry wynik. 
+Odstepstwo od reguły jest również w testach funkcji srednia_parzystych i srednia_nieparzytych. Jest tak ponieważ poprawne wyniki nie zawsze są odpowiedznio parzyste lub nieparzyste i są pomijane.
+Dla k = 1 błąd średniokwadratowy i bezwglęny są o wiele większe i jest to spodziewany efekt.
+Tak jak się można spodziewać wyniki typu ERR mieszczą się w granicach 0-100%.
+Warto zauważyć, że błędy średniokwadradowe i bezwględne są zawyczaj większe od 1. Jest tak dlatego, że każda funkcja agregująca zaokrągla swój wynik do części całkowitej.
+

@@ -1,0 +1,808 @@
+---
+title: "Praca domowa 1"
+author: "Krzysztof Tabeau"
+date: "22/04/2020"
+output: html_document
+---
+
+0. Wstępne ustawienia, załączenie bibliotek oraz pobranie odpowiednich plików .csv.
+  W każdym paragrafie znajdują się 3 funkcje zwracające te same wyniki, ale wykonane za pomocą różnych bibliotek.
+    1. SQLDF
+    2. Funkcje Bazowe
+    3. DPLYR
+    4. Data.table
+  
+  Do tego funkcje 2,3,4 są porównywane do pierwszej za pomocą dplyr::all_equal(), która zwraca czy obiekty zawierają takie sam dane.
+  Mogą byc w różnych permutacjach.
+  
+  Następnie funkcje są porownywane od strony działania czasowego za pomocą microbenchmark::microbenchmark().
+
+```{r message=FALSE}
+options(stringsAsFactors=FALSE)
+options(warn = -1)
+Tags <- read.csv("./csv/Tags.csv")
+Badges <- read.csv("./csv/Badges.csv")
+Comments <- read.csv("./csv/Comments.csv")
+PostLinks <- read.csv("./csv/PostLinks.csv")
+Posts <- read.csv("./csv/Posts.csv")
+Users <- read.csv("./csv/Users.csv")
+Votes <- read.csv("./csv/Votes.csv")
+library(sqldf)
+library(dplyr)
+library(data.table)
+```
+
+1.1 SQLDF
+Zapytanie zwraca pytanie i jego największą liczbę łapek w górę jaką dostał w jednym roku oraz informacje w którym to było roku  
+```{r}
+t11 <- function() {
+  df11 <- sqldf::sqldf(" SELECT
+                           Posts.Title,
+                           UpVotesPerYear.Year,
+                           MAX(UpVotesPerYear.Count) AS Count
+                         FROM (
+                           SELECT
+                             PostId,
+                             COUNT(*) AS Count,
+                             STRFTIME('%Y', Votes.CreationDate) AS Year
+                           FROM Votes
+                           WHERE VoteTypeId=2
+                           GROUP BY PostId, Year
+                         ) AS UpVotesPerYear
+                         JOIN Posts ON Posts.Id=UpVotesPerYear.PostId
+                         WHERE Posts.PostTypeId=1
+                         GROUP BY Year")
+  
+  return(df11)
+}
+```
+
+1.2 Funkcje Bazowe
+```{r}
+#1.2
+t12 <- function() {
+    Votes2 <- Votes
+    Votes2[,"CreationDate"] <- strftime(Votes2[,"CreationDate"],"%Y") 
+    colnames(Votes2)[2] <- "Year"
+    Votes2 <- Votes2[Votes2$VoteTypeId == 2,]
+    UpVotesPerYear <- aggregate(Votes2[,"Id"], by = Votes2[,c("PostId","Year")], FUN = length)
+    colnames(UpVotesPerYear)[3] <- "Count"
+    df12 <- merge(UpVotesPerYear, Posts[Posts$PostTypeId == 1,], by.x = "PostId", by.y = "Id")
+    df12 <- df12[,c("Title","Year","Count")]
+    df12 <- merge(x = aggregate(x = df12["Count"], by = df12["Year"], FUN = max), y = df12)
+    
+    return(df12)
+}
+```
+
+1.3 DPLYR
+```{r}
+#1.3
+t13 <- function() {
+  Votes %>% 
+    filter(VoteTypeId == 2) %>%
+    mutate(Year = strftime(CreationDate,"%Y"), CreationDate = NULL) %>%
+    group_by(PostId,Year) %>%
+    summarise(Count = n()) %>%
+    inner_join((Posts %>% filter(PostTypeId == 1)), by = c("PostId" = "Id")) %>%
+    group_by(Year) %>%
+    top_n(1, Count) %>%
+    select(Title,Year, Count) -> df13
+  
+  return(df13)
+}
+```
+
+1.4 Data.table
+```{r}
+#1.4
+t14 <- function() {
+    VotesT <- data.table::as.data.table(Votes,keep.rownames = TRUE)
+    VotesT[VoteTypeId == 2, .(PostId, Year = strftime(CreationDate, "%Y"))][
+      , .(Count = .N), by =.(PostId,Year)][
+        Posts, on ="PostId==Id", nomatch = 0][
+          PostTypeId == 1, .SD[which.max(Count)], by = Year][
+            , .(Title,Year,Count)] -> df14
+    
+    return(df14)
+}
+```
+
+1.5 Testy jednostkowe
+```{r}
+dplyr::all_equal(t11(),t12())
+dplyr::all_equal(t11(),t13())
+dplyr::all_equal(t11(),t14())
+```
+
+1.6 Testy jakościowe
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=t11(),
+  base=t12(),
+  dplyr=t13(),
+  data.table=t14(),
+times = 10L
+)
+```
+
+1.7 Skrócony wynik zapytania
+```{r}
+head(t11())
+```
+
+2.1 SQLDF
+Zapytanie zwraca nick 10 użytkowników wraz z ich lokacją i wiekem, jęsli te informacje są znane, którzy komentarze są najczęściej lubiane. Zwracany jest również komentarz, który jest ich najbardziej popularny oraz jego liczba łapek w górę. 
+```{r}
+#2.1
+t21 <- function() {
+    df21 <- sqldf(" SELECT
+                      Users.DisplayName,
+                      Users.Age,
+                      Users.Location,
+                      SUM(Posts.FavoriteCount) AS FavoriteTotal,
+                      Posts.Title AS MostFavoriteQuestion,
+                      MAX(Posts.FavoriteCount) AS MostFavoriteQuestionLikes
+                    FROM Posts
+                    JOIN Users ON Users.Id=Posts.OwnerUserId
+                    WHERE Posts.PostTypeId=1
+                    GROUP BY OwnerUserId
+                    ORDER BY FavoriteTotal DESC
+                    LIMIT 10")
+    return(df21)
+}
+```
+
+2.2 Funkcje Bazowe
+```{r}
+#2.2
+t22 <- function() {
+    x <- merge(x = Posts, y = Users, by.x = "OwnerUserId", by.y = "Id")
+    x <- x[x$PostTypeId==1,c("DisplayName","Age","Location","Title","OwnerUserId","FavoriteCount")]
+    colnames(x)[4] <- "MostFavoriteQuestion"
+    y1 <- aggregate(x = x[,"FavoriteCount"], by = x["OwnerUserId"], FUN = function(x) { FavoriteTotal = sum(x,na.rm=TRUE)} )
+    y2 <- aggregate(x = x[,"FavoriteCount"], by = x["OwnerUserId"], FUN = function(x) { MostFavoriteQuestionLikes = as.integer(max(x,na.rm=TRUE))})
+    colnames(y1)[2] <- "FavoriteTotal"
+    colnames(y2)[2] <- "MostFavoriteQuestionLikes"
+    y1 <- head(y1[order(y1$FavoriteTotal, decreasing = TRUE),],10)
+    df22 <- merge(x = y1, y = y2)
+    
+    df22 <- merge(x = df22, y = x, by.x = c("OwnerUserId","MostFavoriteQuestionLikes"), by.y = c("OwnerUserId","FavoriteCount"))
+    df22 <- df22[,-1]
+  
+    return(df22)
+}
+```
+
+2.3 DPLYR
+```{r}
+#2.3
+t23 <- function() {
+    Users %>%
+      inner_join((Posts %>% filter(PostTypeId == 1)), by = c("Id" = "OwnerUserId")) %>%
+      group_by(Id) %>%
+      summarise(FavoriteTotal = sum(FavoriteCount, na.rm=TRUE), MostFavoriteQuestionLikes = as.integer(max(FavoriteCount, na.rm=TRUE))) %>%
+      top_n(10, FavoriteTotal) %>%
+      inner_join( 
+        Posts %>%
+        inner_join(Users, by = c("OwnerUserId" = "Id"))
+        , by = c("Id" = "OwnerUserId", "MostFavoriteQuestionLikes" = "FavoriteCount")) %>%
+      mutate(MostFavoriteQuestion = Title, Title = NULL) %>%
+      select(DisplayName,Age,Location,MostFavoriteQuestion,MostFavoriteQuestionLikes,FavoriteTotal) -> df23
+  return(df23)
+}
+```
+
+2.4 Data.table
+```{r}
+#2.4
+t24 <- function() {
+    PostsT <- data.table::as.data.table(Posts,keep.rownames = TRUE)
+    PostsT[Users, on ="OwnerUserId==Id", nomatch = 0][
+      PostTypeId == 1, .(FavoriteTotal = sum(FavoriteCount, na.rm=TRUE), 
+                         MostFavoriteQuestionLikes = as.integer(max(FavoriteCount, na.rm=TRUE))),by = OwnerUserId][
+                           order(-rank(FavoriteTotal))][
+                             1:10,][
+                               PostsT[Users, on ="OwnerUserId==Id", nomatch = 0],
+                               on = c("OwnerUserId==OwnerUserId","MostFavoriteQuestionLikes==FavoriteCount"), nomatch = 0][
+                                   , .(DisplayName,Age,Location,MostFavoriteQuestion = Title,MostFavoriteQuestionLikes,FavoriteTotal)] -> df24
+                               
+    return(df24)
+}
+```
+
+2.5 Testy jednostkowe
+```{r warning=FALSE, message=FALSE}
+dplyr::all_equal(t21(),t22())
+dplyr::all_equal(t21(),t23())
+dplyr::all_equal(t21(),t24())
+```
+
+2.6 Testy jakościowe
+```{r warning=FALSE, message=FALSE}
+microbenchmark::microbenchmark(
+  sqldf=t21(),
+  base=t22(),
+  dplyr=t23(),
+  data.table=t24(),
+times = 500L)
+```
+
+2.7 Wynik zapytania
+```{r}
+t21()
+```
+
+3.1 SQLDF
+Zapytanie zwraca id, tytuł i liczbę pozytywnych odpowiedzi pytańz największą liczbą pozytywnych odpowiedzi.
+```{r}
+#3.1
+t31 <- function(){
+    df31 <- sqldf(" SELECT
+                      Posts.ID,
+                      Posts.Title,
+                      Posts2.PositiveAnswerCount
+                    FROM Posts
+                    JOIN (
+                      SELECT
+                        Posts.ParentID,
+                        COUNT(*) AS PositiveAnswerCount
+                      FROM Posts
+                      WHERE Posts.PostTypeID=2 AND Posts.Score>0
+                      GROUP BY Posts.ParentID
+                    ) AS Posts2
+                    ON Posts.ID=Posts2.ParentID
+                    ORDER BY Posts2.PositiveAnswerCount DESC
+                    LIMIT 10")
+   return(df31)
+}
+```
+
+3.2 Funkcje Bazowe
+```{r}
+#3.2
+t32 <- function() {
+    Posts2 <- Posts[Posts$Score>0 & Posts$PostTypeId == 2,]
+    Posts2 <- aggregate(x = Posts2[1], by = Posts2["ParentId"], FUN = length)
+    colnames(Posts2)[2] <- "PositiveAnswerCount"
+    Posts1 <- Posts[,c("Id","Title")]
+    Posts1 <- merge(x = Posts1, y = Posts2 , by.x = "Id", by.y = "ParentId")
+    Posts1 <- Posts1[order(Posts1$PositiveAnswerCount, decreasing = TRUE),]
+    df32<- head(Posts1,10)
+    return(df32)
+}
+```
+
+3.3 DPLYR
+```{r}
+#3.3
+t33 <- function() {
+    Posts %>%
+      filter(Score>0 & PostTypeId == 2) %>%
+      group_by(ParentId) %>%
+      summarise(PositiveAnswerCount = n()) %>%
+      inner_join(Posts %>% select(Id,Title), by = c("ParentId" = "Id")) %>%
+      mutate(Id = ParentId, ParentId = NULL) %>%
+      top_n(10, PositiveAnswerCount) %>% slice(1:10) -> df33
+    return(df33)
+}
+```
+
+3.4 Data.table
+```{r}
+#3.4
+t34 <- function() {
+    PostsT <- data.table::as.data.table(Posts,keep.rownames = TRUE)
+    PostsT[Score>0,][
+      PostTypeId == 2,][
+        , .(PositiveAnswerCount = .N),by = ParentId][
+          Posts, on ="ParentId==Id", nomatch = 0][
+            order(-rank(PositiveAnswerCount))][
+              1:10,][
+                ,.(Title,Id = ParentId,PositiveAnswerCount)] -> df34
+    return(df34)
+}
+```
+
+3.5 Testy jednostkowe
+```{r}
+dplyr::all_equal(t31(),t32())
+dplyr::all_equal(t31(),t33())
+dplyr::all_equal(t31(),t34())
+```
+
+3.6 Testy jakościowe
+```{r}  
+microbenchmark::microbenchmark(
+  sqldf=t31(),
+  base=t32(),
+  dplyr=t33(),
+  data.table=t34(),
+times = 500L)
+```
+
+3.7 Wynik zapytania
+```{r}
+t31()
+```
+
+4.1 SQLDF
+Zapytanie zwraca największe różnice między najbaredziej punktowanymi odpowiedziami na pytanie oraz zaakceptowaną odpowiedzią na pytanie. Do tego informacje o pytaniu (treść i id) oraz punkty wyżej wymienionych odpowiedzi.
+```{r}
+#4.1
+t41 <- function(){
+    df41 <- sqldf(" SELECT
+                    Questions.Id,
+                    Questions.Title,
+                    BestAnswers.MaxScore,
+                    Posts.Score AS AcceptedScore,
+                    BestAnswers.MaxScore-Posts.Score AS Difference
+                  FROM (
+                    SELECT Id, ParentId, MAX(Score) AS MaxScore
+                    FROM Posts
+                    WHERE PostTypeId==2
+                    GROUP BY ParentId
+                  ) AS BestAnswers
+                  JOIN (
+                    SELECT * FROM Posts
+                    WHERE PostTypeId==1
+                  ) AS Questions
+                  ON Questions.Id=BestAnswers.ParentId
+                  JOIN Posts ON Questions.AcceptedAnswerId=Posts.Id
+                  WHERE Difference>50
+                  ORDER BY Difference DESC ")
+    return(df41)
+}
+```
+
+4.2 Funkcje bazowe
+```{r}
+#4.2
+t42 <- function() {
+    BestAnswers <- Posts[Posts$PostTypeId == 2,c("Id","ParentId","Score")]
+    score <- aggregate(BestAnswers[,"Score"], by = BestAnswers["ParentId"], FUN = max)
+    colnames(score)[2] <- "MaxScore"
+    BestAnswers <- merge(x = score, y = BestAnswers, by.x = c("ParentId","MaxScore"), by.y = c("ParentId","Score"))
+    BestAnswers <- aggregate(BestAnswers["Id"], by = BestAnswers[c("MaxScore","ParentId")], FUN = min)
+    
+    Questions <- Posts[Posts$PostTypeId == 1,]
+    
+    df42 <- merge(x = Questions, y = BestAnswers, by.x = "Id", by.y = "ParentId")
+    df42 <- merge(x = df42, y = Posts, by.x = "AcceptedAnswerId", by.y = "Id", suffixes = c("",".p"))
+    Difference <-  df42["MaxScore"] - df42["Score.p"]
+    df42 <- cbind(df42[,c("Id","Title", "MaxScore","Score.p")],Difference)
+    colnames(df42) <- c("Id","Title", "MaxScore","AcceptedScore","Difference")
+    df42 <- df42[df42$Difference > 50,]
+    df42 <- df42[order(df42$Difference,decreasing = TRUE),]
+    
+    return(df42)
+}
+```
+
+4.3 DPLYR
+```{r}
+#4.3
+t43 <- function() {
+    Posts %>% 
+        filter(PostTypeId == 2) %>%
+        select(Id,ParentId,Score) %>%
+        group_by(ParentId) %>%
+        summarise(MaxScore = max(Score)) %>%
+        inner_join(
+            Posts %>% 
+               filter(PostTypeId == 2) %>%
+               select(Id,ParentId,Score),
+            by = c("ParentId" = "ParentId", "MaxScore" = "Score")) %>%
+        group_by(ParentId,MaxScore) %>%
+        summarise(Id = min(Id)) %>%
+        inner_join(Posts %>% filter(PostTypeId == 1), by = c("ParentId" = "Id")) %>%
+        inner_join(Posts, by = c("AcceptedAnswerId" = "Id")) %>%
+        bind_cols(Difference = (.$MaxScore - .$Score.y)) %>%
+        ungroup(ParentId.x) %>%
+        select(ParentId.x,Title.x,MaxScore,Score.y,Difference) %>%
+        filter(Difference > 50) %>%
+        arrange(desc(Difference)) %>%
+        mutate(Id = ParentId.x,Title = Title.x, AcceptedScore = Score.y,ParentId.x = NULL, Title.x = NULL, Score.y = NULL) -> df43
+    return(df43)
+}
+```
+
+4.4 Data.table
+```{r}
+#4.4
+t44 <- function() {
+    PostsT <- data.table::as.data.table(Posts,keep.rownames = TRUE)
+    PostsT[PostTypeId == 2,.(Id,ParentId,Score)][
+      ,.(MaxScore = max(Score)),by = ParentId][
+        PostsT[PostTypeId == 2,.(Id,ParentId,Score)], on= c("ParentId==ParentId", "MaxScore==Score"), nomatch = 0][
+          ,.(Id = min(Id)), by = list(ParentId,MaxScore)][
+            Posts[Posts$PostTypeId == 1,], on = "ParentId==Id"][
+              Posts,on = "AcceptedAnswerId==Id"][
+                , Difference := (MaxScore - i.Score)][
+                  ,.(Id = ParentId,Title,MaxScore,AcceptedScore = i.Score,Difference)][Difference >50,][order(-rank(Difference))] -> df44
+    return(df44)
+}
+```
+
+4.5 Testy jednostkowe
+```{r}
+dplyr::all_equal(t41(),t42())
+dplyr::all_equal(t41(),t43())
+dplyr::all_equal(t41(),t44())
+```
+
+4.6 Testy jakosciowe
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=t41(),
+  base=t42(),
+  dplyr=t43(),
+  data.table=t44(),
+times = 500L)
+```
+
+4.7 Skrócony wynik zapytania
+```{r}
+head(t41())
+```
+
+51. SQLDF
+Zapytanie zwraca informację o 10 najbardziej punktowanych komentarzach poszczegolnych użytkowników oraz pytanie na jakie odpowiadało  
+```{r}
+#5.1
+t51 <- function() {
+  df51 <- sqldf(" SELECT
+                  Posts.Title,
+                  CmtTotScr.CommentsTotalScore
+                FROM (
+                  SELECT
+                    PostID,
+                    UserID,
+                    SUM(Score) AS CommentsTotalScore
+                  FROM Comments
+                  GROUP BY PostID, UserID
+                ) AS CmtTotScr
+                JOIN Posts ON Posts.ID=CmtTotScr.PostID AND Posts.OwnerUserId=CmtTotScr.UserID
+                WHERE Posts.PostTypeId=1
+                ORDER BY CmtTotScr.CommentsTotalScore DESC
+                LIMIT 10")
+  return(df51)
+}
+```
+
+5.2 Funkcje bazowe
+```{r}
+#5.2
+t52 <- function() {
+    CmtTotScr <- aggregate(Comments[,"Score"], by = Comments[c("PostId","UserId")], FUN = sum)
+    colnames(CmtTotScr)[3] <- "CommentsTotalScore"
+    df52 <- merge(x = Posts[Posts$PostTypeId==1,],y = CmtTotScr, by.x = c("Id","OwnerUserId"), by.y = c("PostId","UserId"))
+    df52 <- df52[order(df52$CommentsTotalScore, decreasing = TRUE, na.last = TRUE),]
+    df52 <- head(df52,10)
+    df52 <- df52[,c("Title","CommentsTotalScore")]
+    return(df52)
+}
+```
+
+5.3 DPLYR
+```{r}
+#5.3
+t53 <- function() {
+    Comments %>%
+        group_by(PostId,UserId) %>%
+        summarise(CommentsTotalScore = sum(Score)) %>%
+        inner_join(Posts %>% filter(PostTypeId == 1), by = c("PostId"="Id", "UserId" = "OwnerUserId")) %>%
+        ungroup(PostId) %>%
+        select(Title,CommentsTotalScore) %>%
+        arrange(desc(CommentsTotalScore)) %>%
+        slice(1:10,) -> df53
+    return(df53)
+}
+```
+
+5.4 Data.table
+```{r}
+#5.4
+t54 <- function() {
+    CommentsT <- data.table::as.data.table(Comments,keep.rownames = TRUE)
+    CommentsT[,.(CommentsTotalScore = sum(Score)), by = list(PostId,UserId)][
+      Posts[Posts$PostTypeId == 1,], on= c("PostId==Id", "UserId==OwnerUserId"), nomatch = 0][
+        order(-rank(CommentsTotalScore))][
+          1:10,.(Title,CommentsTotalScore)] -> df54
+    return(df54)
+}
+```
+
+5.5 Testy jednostkowe
+```{r}
+dplyr::all_equal(t51(),t52())
+dplyr::all_equal(t51(),t53())
+dplyr::all_equal(t51(),t54())
+```
+
+5.6 Testy jakościowe
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=t51(),
+  base=t52(),
+  dplyr=t53(),
+  data.table=t54(),
+times = 500L)
+```
+
+5.7 Wynik zapytania
+```{r}
+t51()
+```
+
+6.1 SQLDF
+Zapytanie zwraca informację, które są dostępne, o użytkownikach (id, nick, reputacja, wiek, lokacja), którzy mają między 2, 10 odnak pierwszej klasy. 
+```{r}
+#6.1
+t61 <- function() {
+  df61 <- sqldf(" SELECT DISTINCT
+                    Users.Id,
+                    Users.DisplayName,
+                    Users.Reputation,
+                    Users.Age,
+                    Users.Location
+                  FROM (
+                    SELECT
+                      Name, UserID
+                      FROM Badges
+                    WHERE Name IN (
+                      SELECT
+                        Name
+                      FROM Badges
+                      WHERE Class=1
+                      GROUP BY Name
+                      HAVING COUNT(*) BETWEEN 2 AND 10
+                    )
+                    AND Class=1
+                  ) AS ValuableBadges
+                  JOIN Users ON ValuableBadges.UserId=Users.Id")
+  return(df61)
+}
+```
+
+6.2 Funkcje bazowe
+```{r}
+#6.2
+t62 <- function() {
+    Bad <- Badges[Badges$Class ==1,]
+    Names <- aggregate(Bad[1], by = Bad["Name"], FUN = length) 
+    colnames(Names)[2] <- "count"
+    Names <- Names[Names$count >= 2 & Names$count <= 10,]
+    ValuableBadges <- merge(x = Names[-2], y = Badges, by = "Name")
+    ValuableBadges <- ValuableBadges[ValuableBadges$Class == 1, c("Name", "UserId")]
+    df62 <- merge(x = Users, y = ValuableBadges, by.x = "Id", by.y = "UserId")
+    df62 <- unique(df62[,c("Id","DisplayName","Reputation","Age","Location")])
+    return(df62)
+}
+```
+
+6.3 DPLYR
+```{r}
+#6.3
+t63 <- function() {
+  Badges %>% 
+      filter(Class == 1) %>%
+      group_by(Name) %>%
+      summarise(Count = n()) %>%
+      filter(Count >= 2 & Count <= 10) %>%
+      select(Name) %>%
+      inner_join(Badges, on = c("Name","Name")) %>%
+      filter(Class == 1) %>%
+      select(Name,UserId) %>%
+      inner_join(Users, by= c("UserId"="Id")) %>%
+      ungroup(Name) %>%
+      mutate(Id = UserId, UserId = NULL) %>%
+      select(Id,DisplayName,Reputation,Age,Location) %>% 
+      distinct() -> df63
+  return(df63)
+}
+```
+
+6.4 Data.table
+```{r}
+#6.4
+t64 <- function() {
+    BadgesT <- data.table::as.data.table(Badges,keep.rownames = TRUE)
+    BadgesT[Class == 1, .(Count = .N), by = .(Name)][
+      Count >= 2 & Count <= 10, ,(Name)][
+        Badges[Badges$Class ==  1, ], on ="Name==Name", nomatch = 0][
+          Users, on = "UserId==Id", nomatch = 0][
+            ,.(Id = UserId, DisplayName, Reputation,Age,Location)] -> df64
+    df64 <- unique(df64)
+    return(df64)
+}
+```
+
+6.5 Testy jednostkowe
+```{r warning=FALSE, message=FALSE}
+dplyr::all_equal(t61(),t62())
+dplyr::all_equal(t61(),t63())
+dplyr::all_equal(t61(),t64())
+```
+
+6.6 Testy jakościowe
+```{r warning=FALSE,message=FALSE}
+microbenchmark::microbenchmark(
+  sqldf=t61(),
+  base=t62(),
+  dplyr=t63(),
+  data.table=t64(),
+times = 500L)
+```
+
+6.7 Wynik zapytania
+```{r}
+t61()
+```
+
+7.1 SQLDF
+Zapytanie zwraca pytanie na któremu nikt nie przyznał punku od 2016 włącznie. Zwraca również liczbę punktów uzyskanych przez 2016 rokiem.
+```{r}
+#7.1
+t71 <- function(){
+  df71 <- sqldf(" SELECT
+                    Posts.Title,
+                    VotesByAge2.OldVotes
+                  FROM Posts
+                  JOIN (
+                    SELECT
+                      PostId,
+                      MAX(CASE WHEN VoteDate = 'new' THEN Total ELSE 0 END) NewVotes,
+                      MAX(CASE WHEN VoteDate = 'old' THEN Total ELSE 0 END) OldVotes,
+                      SUM(Total) AS Votes
+                    FROM (
+                      SELECT
+                        PostId,
+                        CASE STRFTIME('%Y', CreationDate)
+                        WHEN '2017' THEN 'new'
+                        WHEN '2016' THEN 'new'
+                        ELSE 'old'
+                        END VoteDate,
+                        COUNT(*) AS Total
+                      FROM Votes
+                      WHERE VoteTypeId=2
+                      GROUP BY PostId, VoteDate
+                    ) AS VotesByAge
+                    GROUP BY VotesByAge.PostId
+                    HAVING NewVotes=0
+                  ) AS VotesByAge2 ON VotesByAge2.PostId=Posts.ID
+                  WHERE Posts.PostTypeId=1
+                  ORDER BY VotesByAge2.OldVotes DESC
+                  LIMIT 10")
+  return(df71)
+}
+```
+
+7.2 Funkcje bazowe
+```{r}
+#7.2
+t72 <- function() {
+    VotesByAge <- Votes[Votes$VoteTypeId == 2,c("PostId","CreationDate","Id")]
+    VotesByAge[,"CreationDate"] <- strftime(VotesByAge[,"CreationDate"],"%Y") 
+    colnames(VotesByAge)[2] <- "Year"
+    
+    VotesByAge[VotesByAge$Year == 2016,"VoteDate"] <- "new"
+    VotesByAge[VotesByAge$Year == 2017,"VoteDate"] <- "new"
+    VotesByAge[VotesByAge$Year > 2017,"VoteDate"] <- "old"
+    VotesByAge[VotesByAge$Year < 2016,"VoteDate"] <- "old"
+    colnames(VotesByAge)[4] <- "VoteDate"
+    
+    VotesByAge <- aggregate(VotesByAge[,"Id"],by = VotesByAge[c("VoteDate","PostId")], FUN = length)
+    colnames(VotesByAge)[3] <- "Total"
+    VotesN <- VotesByAge[VotesByAge$VoteDate == 'new',]
+    VotesO <- VotesByAge[VotesByAge$VoteDate == 'old',]
+    VotesN <- aggregate(VotesN[,"Total"], by = VotesN["PostId"], FUN = function(x) as.integer(max(x,0)) )
+    VotesO <- aggregate(VotesO[,"Total"], by = VotesO["PostId"], FUN = function(x) as.integer(max(x,0)) )
+    VotesS <- aggregate(VotesByAge[,"Total"], by = VotesByAge["PostId"], FUN = sum)
+    V <- merge(x = VotesN, y = VotesO, by = "PostId", suffixes = c(".n",".o"), all = TRUE)
+    V <- merge(x = V, y = VotesS, by = "PostId", all = TRUE)
+    colnames(V) <- c("PostId","NewVotes","OldVotes","Votes")
+    V[is.na(V$NewVotes),"NewVotes"] <- as.integer(0)
+    V <- V[V$NewVotes == 0,]
+
+    df72 <- merge(x = V,y = Posts, by.x = "PostId", by.y = "Id" )
+    df72 <- df72[df72$PostTypeId == 1, c("Title","OldVotes")]
+    df72 <- head(df72[order(df72$OldVotes, decreasing = TRUE),],10)
+    rownames(df72) <- NULL
+    return(df72)
+}
+```
+
+7.3 DPLYR
+```{r}
+#7.3
+t73 <- function() {
+    Votes %>%
+        filter(VoteTypeId == 2) %>%
+        select(PostId, CreationDate, Id) %>%
+        mutate(Year = strftime(CreationDate,"%Y"), CreationDate = NULL) %>%
+        mutate(VoteDate = case_when(Year == 2016 ~ "new",
+                                     Year == 2017 ~ "new",
+                                     Year > 2017 ~ "old",
+                                     Year < 2016 ~ "old")) %>%
+        group_by(VoteDate,PostId) %>%
+        summarise(Total = n()) -> VotesByAge
+    
+    VotesByAge %>%
+        group_by(PostId) %>%
+        summarise(Votes = as.integer(sum(Total))) -> VotesS
+    
+    VotesByAge %>%
+        filter(VoteDate == "new") %>% 
+        group_by(PostId) %>%
+        summarise(NewVotes = as.integer(max(Total,0))) -> VotesN
+        
+    VotesByAge %>%
+        filter(VoteDate == "old") %>% 
+        group_by(PostId) %>%
+        summarise(OldVotes = as.integer(max(Total,0))) %>%
+        full_join(VotesN, by = c("PostId"="PostId")) %>%
+        full_join(Votes, by = c("PostId"="PostId")) %>%
+        mutate(NewVotes = case_when(is.na(NewVotes) ~ as.integer(0),
+                                    TRUE ~ NewVotes)) %>%
+        filter(NewVotes == 0) %>% 
+        inner_join(Posts, by = c("PostId"="Id")) %>%
+        filter(PostTypeId == 1) %>%
+        select(Title,OldVotes) %>%
+        distinct() %>%
+        top_n(10,OldVotes) %>% 
+        arrange(desc(OldVotes)) %>% 
+        slice(1:10)  -> df73
+    return(df73)
+}
+```
+
+7.4 Data.table
+```{r}
+#7.4
+t74 <- function() {
+    VotesT <- data.table::as.data.table(Votes,keep.rownames = TRUE)
+    VotesT[VoteTypeId == 2, .(PostId, Year = strftime(CreationDate,"%Y"), CreationDate = NULL, Id)][
+      , VoteDate := case_when( Year == 2016 ~ "new",
+                               Year == 2017 ~ "new",
+                               Year > 2017 ~ "old",
+                               Year < 2016 ~ "old")][,.(Total = .N), by = .(VoteDate,PostId)] -> VotesByAge
+    
+    VotesByAge[VoteDate == "new", .(NewVotes = as.integer(max(Total,0))), by = .(PostId)] -> VotesN
+    VotesByAge[VoteDate == "old", .(OldVotes = as.integer(max(Total,0))), by = .(PostId)] -> VotesO
+    
+    VotesByAge[, .(Votes = as.integer(sum(Total))), by = .(PostId)][
+      VotesN, on = "PostId==PostId", nomatch = NA][
+        VotesO, on = "PostId==PostId", nomatch = NA] -> VotesByAge2
+    VotesByAge2[,NewVotes := case_when(is.na(NewVotes) ~ 0L,
+                                       TRUE ~ NewVotes)][
+                 NewVotes == 0,][
+                   Posts, on ="PostId==Id", nomatch = 0][
+                     PostTypeId == 1, Title, OldVotes][order(-rank(OldVotes))][1:10,] -> df74
+    return(df74)
+}
+```
+
+7.5 Testy jednostkowe
+```{r}
+dplyr::all_equal(t71(),t72())
+dplyr::all_equal(t71(),t73())
+dplyr::all_equal(t71(),t74())
+```
+
+7.6 Testy jakościowe
+```{r}
+microbenchmark::microbenchmark(
+  sqldf=t71(),
+  base=t72(),
+  dplyr=t73(),
+  data.table=t74(),
+times = 10L)
+```
+
+7.7 Wynik zapytania
+```{r}
+t71()
+```
+
+Koniec

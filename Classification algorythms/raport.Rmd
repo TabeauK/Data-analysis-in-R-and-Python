@@ -1,0 +1,382 @@
+---
+title: "Raport"
+author: "Krzysztof Tabeau"
+date: "12/05/2020"
+output: pdf_document
+---
+1. Wstęp 
+
+W poniższym raporcie są umieszczone porównania błędów funkcji agregujących dla różnych k dla różnych przestrzeni L oraz wyniki błędów funkcji klasyfikujących RandomForest, Mass::polr (tam gdzie wynik był zbieżny) oraz class::knn dla każdej ramki danych oraz podsumowanie i wnioski. 
+
+```{r Benchmarks, include=FALSE}
+library(ggplot2)
+library(ggpubr)
+source("raport_pomocnicze.R")
+
+ DFsnames <- c("abalone","abalone_ord","affairs","ailerons","auto_ord", "auto_riskness",
+               "bostonhousing","bostonhousing_ord","cement_strength","californiahousing","fireman_example",
+               "glass","kinematics","machine_ord","skill","stock_ord","winequality_red","winequality_white","wisconsin_breast_ord")
+  
+  LNames <- c("L1","L2","LInf")
+  
+  funsNames <- c("moda","srednia_a","mediana","minkara1.5","minkara3","minkara10","srednia_parzytych","srednia_nieparzytych")
+  
+  folder <- "C:\\Users\\krzys\\Documents\\Pepe_Tabeau_Krzysztof_290504_pd2\\benchmarks\\"
+  
+  DFF <- lapply(DFsnames, function(name){
+    lapply(LNames, function(L){
+      lapply(funsNames, function(fun){
+        try(read.csv(paste(folder,name,"_",L,"_",fun,".csv",sep="", collapse = NULL)))
+      })
+    })
+  })
+  
+  Rforests <- lapply(DFsnames, function(name){
+      read.csv(paste(folder,name,"_RandomForest.csv",sep="", collapse = NULL))
+  })
+  
+  Polr <- lapply(DFsnames, function(name){
+      try(read.csv(paste(folder,name,"_MassPolr.csv",sep="", collapse = NULL)))
+  })
+  
+  ClassKnn <- lapply(DFsnames, function(name){
+      read.csv(paste(folder,name,"_ClassKnn.csv",sep="", collapse = NULL))
+  })
+  
+  przetworz_wszystko <- function(i) {
+    errors <- t(unlist(Rforests[i],recursive = F))
+    errors <- rbind(errors,t(unlist(ClassKnn[i],recursive = F)))
+    rownames(errors) <- c("RandomForest", "Class::knn")
+    try(errors <- rbind(errors,t(unlist(Polr[i],recursive = F))))
+    try(rownames(errors) <- c("RandomForest", "Class::knn", "MASS::polr"))
+    print(errors)
+    DF <- unlist(DFF[i], recursive = F)
+    try(print_data(DF,DFsnames[i],(1:20)))
+  }
+  
+```
+
+2. Abalone
+
+  2.1 Wyniki
+
+```{r abalone, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(1)
+```
+
+  2.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najgorzej radzi sobie moda, a najlepiej mediana.
+  W błędzie bezwzględnym i średniokwadratowym jednak nieco lepszą funkcją od mediany jest minkara1.5 i minkara3.0. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się minkara10, ale w znacznie mniejszej skali.
+  Ciekawą obserwacją jest również fakt, że dla k=2 najlepiej sobie radzi średnia.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Nie ma większej różnicy wyników między różnymi matrykami L.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe.
+  
+3. abalone_ord
+
+    3.1 Wyniki
+    
+```{r abalone_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(2)
+```
+
+  3.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najgorzej radzi sobie srednia_nieparzystych, a najlepiej mediana.
+  W błędzie bezwzględnym i średniokwadratowym jednak nieco lepszą funkcją od mediany jest minkara1.5 i minkara3.0. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się minkara10, ale w znacznie mniejszej skali.
+  Ciekawą obserwacją jest również fakt, że dla k=2 najlepiej sobie radzi średnia.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Nie ma większej różnicy wyników między różnymi matrykami L.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe.
+  
+4. affairs
+
+    4.1 Wyniki
+
+```{r affairs, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(3)
+```
+
+  4.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji im wieksze k tym lepiej radzi sobie moda i średnia.  
+  W błędzie bezwzględnym i średniokwadratowym jednak najlepszymi funkcjami są mediany, minkara1.5, minkara3.0. 
+  Ciekawą obserwacją jest również fakt, że dla k=2,3 oprócz mody i średniej, funkcje działają najlepiej.
+  Nie ma większej różnicy wyników między różnymi matrykami L.
+  W proporcji błędnej klasyfikacji najgorzej radza sobie lasy losowe, ale błąd średniokwadratowy mają podobne do najlepszych wyników funkcji         implementowanych. Class:knn ma na odwrót.
+  
+5. affairs
+
+    5.1 ailerons
+  
+```{r ailerons, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(4)
+```
+
+  5.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki są zbilżone do siebie niezależnie od k i funkcji.
+  W błędzie bezwzględnym i średniokwadratowym jednak najlepiej radzącącymi sobie funkcjami są mediana, minkara1.5 i minkara3.0. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się minkara10, ale w mniejszej skali.
+  Ciekawą obserwacją jest również fakt, że dla k=2 najlepiej sobie radzi średnia.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe. Class::knn radzi sobie gorzej niż funkcje implementowane.
+  
+6. auto_ord
+
+    6.1 Wyniki
+    
+```{r auto_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(5)
+```
+
+  6.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki są zbilżone, ale najlepszy rezutata daje średnia.
+  W błędzie bezwzględnym i średniokwadratowym jednak najlepiej radzącącymi sobie funkcjami są mediana, minkara1.5 i minkara3.0. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się minkara10, ale w mniejszej skali.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe. Class::knn radzi sobie gorzej niż funkcje implementowane.
+  
+7. auto_riskness
+
+    7.1 Wyniki
+    
+```{r auto_riskness, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(6)
+```
+
+  7.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji dla mniejszych k najlepeij działa srednia_parzystych,a dal większych mediana.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącą sobie funkcją jest mediana. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się srednia, ale w mniejszej skali.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe. Class::knn radzi sobie porównywalnie do funkcji implementowanych.
+  
+8. bostonhousing
+
+    8.1 Wyniki
+    
+```{r bostonhousing, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(7)
+```
+
+  8.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji dla mniejszych k najlepeij działa mediana ,a dla większych wyniki są zbiżone do siebie.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącą sobie funkcją jest mediana. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się srednia, ale w mniejszej skali.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe i MASS:polr. Class::knn radzi sobie porównywalnie do funkcji implementowanych.
+  
+9. bostonhousing_ord
+
+    9.1 Wyniki
+    
+```{r bostonhousing_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(8)
+```
+
+  9.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji dla mniejszych k najlepeij działa srednia_parzystych.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącymi sobie funkcjami są średnia i średnia parzystych. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe i MASS:polr. Class::knn radzi sobie porównywalnie do funkcji implementowanych.
+  
+10. cement_strength
+
+    10.1 Wyniki
+    
+```{r cement_strength, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(9)
+```
+
+  10.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najlepsze wyniki są dla k=1, oprócz dla srednich parzystych i nieparzystych.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącą sobie minkara1.5, minkara3.
+  Warto zauważyć, że dal każdego k wynik są podobne, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Na odwrót zachowują     się srednie parzystych i nieparzystych.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe i MASS:polr. Class::knn radzi sobie porównywalnie do funkcji implementowanych.
+  
+11. californiahousing
+
+    11.1 Wyniki
+    
+```{r californiahousing, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(10)
+```
+
+  11.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki dla róznych funkcji są zblizone do siebie, oprócz mody i średnich, które są nieco większe.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącą sobie minkara1.5, minkara3. 
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe. Class::knn radzi sobie nieco gorzej do funkcji implementowanych.
+  
+12. fireman_example
+
+    12.1 Wyniki
+    
+```{r fireman_example, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(11)
+```
+
+12.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najgorzej radzi sobie moda i minkara10, a najlepiej mediana. Dla rożnych k wyniki są zbliżone do siebie
+  W błędzie bezwzględnym i średniokwadratowym funkcje mają analogiczne wyniki do proporcji błedów.
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy dla małych k są mniejsze od tych dla dużych k. Podobnie zachowuje   się minkara10, ale w znacznie mniejszej skali.
+  Ciekawą obserwacją jest również fakt, że dla k=2 najlepiej sobie radzi średnia.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Nie ma większej różnicy wyników między różnymi matrykami L.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe, ale wyniki funkcji implementowanych są do nich zbliżone.
+  
+13. glass
+
+    13.1 Wyniki
+    
+```{r glass, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(12)
+```
+
+  13.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najlepsze wyniki są dla k=1, oprócz dla srednich parzystych i nieparzystych.
+  W błędzie bezwzględnym i średniokwadratowym najlepsze wyniki są dla k=1, a dla wiekszych k, dla srednich_parzystych
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych najlepeij radzą sobie lasy losowe. Class::knn i MASS:polr radzą sobie gorzej w porównaniu do funkcji implementowanych.
+  
+14. kinematics
+
+    14.1 Wyniki
+    
+```{r kinematics, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(13)
+```
+
+  14.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najlepsze wyniki daje mediana.
+  W błędzie bezwzględnym i średniokwadratowym najlepiej radzącą sobie minkara1.5 i mediana 
+  Warto zauważyć, że dla większych k wyniki są zbliżone do siebie.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją,
+  odwrotnie do mody, która najlepsze wyniki osiąga dla najmniejszych k.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a MASS:polr i lasy losowe gorzej
+  
+15. machine_ord
+
+    15.1 Wyniki
+    
+```{r machine_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(14)
+```
+
+  15.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najlepsze wyniki są osiagane dla mniejszych k, a wśród nich dla funkcji różnych od mody i srednich parzystych.
+  W błędzie bezwzględnym i średniokwadratowym najgorzej radzącą sobie minkara3, minkara10 i srednia parzystych. Reszta funkcji osiąga porównywalne wyniki. 
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe znacznie lepiej.
+  
+16. skill
+
+    16.1 Wyniki
+    
+```{r skill, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(15)
+```
+
+  16.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji oraz w błędzie bezwzględnym i średniokwadratowym dla każdego k wyniki funkcji są porównywalne oprócz dla mody i srednich parzystych i nieparzystych. Nieco lepszymi funkcjami okazują się też mediana i minkara1.5
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją,
+  odwrotnie do mody, która najlepsze wyniki osiąga dla najmniejszych k.
+  Im większe L tym wyniki są nieco gorsze.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe nieco lepiej.
+  
+17. stock_ord
+
+    17.1 Wyniki
+    
+```{r stock_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(16)
+```
+
+  17.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki dla różnych k są lekko malejące. Najlepsze wyniki osiąga moda.
+  W błędzie bezwzględnym i średniokwadratowym dla każdego k i kązdej funkcji wyniki są porównywalne oprócz dla mody i srednich parzystych i nieparzystych, dla których błedy są znacznie większe. 
+  Dla kązdego L wyniki są bardzo podobne.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe znacznie lepiej, a MASS:polr tylko nieco lepiej.
+  
+18. winequality_red
+
+    18.1 Wyniki
+    
+```{r winequality_red, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(17)
+```
+
+  18.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki dla różnych k są porównywalne. Najlepsze wyniki osiąga mediana.
+  W błędzie bezwzględnym i średniokwadratowym dla każdego k i każdej funkcji wyniki są porównywalne oprócz dla srednich parzystych i nieparzystych, dla których błedy są znacznie malejące i dla mody dla której są rosnące. 
+  Dla kązdego L wyniki są bardzo podobne.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe i MASS:polr nieco lepiej.
+  
+19. winequality_red
+
+    19.1 Wyniki
+    
+```{r winequality_white, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(18)
+```
+
+  19.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji wyniki dla różnych k są porównywalne. Najlepsze wyniki osiągą mediana i minkara.
+  Wyniki w błędzie bezwzględnym i średniokwadratowym są analogiczne do proporcji błędnej klasyfikacji oprócz dla srednich parzystych i nieparzystych, dla których błedy są malejące i dla mody dla której są rosnące. 
+  Dla kązdego L wyniki są bardzo podobne.
+  Z funkcji bibliotecznych Class::knn radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe i MASS:polr nieco lepiej.
+  
+20. wisconsin_breast_ord
+
+    20.1 Wyniki
+    
+```{r wisconsin_breast_ord, echo=FALSE, message=FALSE, warning=FALSE}
+przetworz_wszystko(19)
+```
+
+  20.2 Podsumowanie i wnioski
+  
+  W proporcji błędnej klasyfikacji najlepsze wyniki osiągają moda i średnia.
+  W błędzie bezwzględnym i średniokwadratowym jednak nieco lepszymi funkcjami są minkara
+  Warto zauważyć, że im większe k, tym wyniki są lepsze, oprócz mody ktorej błędy są porównywalne dla kązdego k.
+  Jak można było się spodzieać funkcje średnia_parzystych i średnia_nieparzystych dają duże błędy na początku, ale z przyrostem k, maleją.
+  Dla kązdego L wyniki są bardzo podobne.
+  Z funkcji bibliotecznych Class::knn i MASS:polr radzi sobie prównywalnie do funkcji implementowanych, a lasy losowe lepiej.
+  
+21. Podsumowanie ogólne
+
+Najlepiej rdziałającymi funkcjami są mediana i minkara. W rzadkich przypadkach jest to moda lub średnia parzystych lub nie parzystych. W wiekszości przypadków lasy losowe dają lepsze wyniki, ale są od tego wyjątki. Podobne wyniki do lasów losowych osiąga MASS:polr, a przynajmniej tam gdzie udało się policzyć wynik dla tej funkcji. Class::Knn osiąga wyniki zbliżone do funkcji implementowanych. Zmiana metryki L nie wpływa znacząco na wyniki.
+
+
+
+
+
+
